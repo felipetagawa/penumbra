@@ -15,6 +15,34 @@
         background: #000;
         overflow: hidden;
         font-family: 'Courier New', monospace;
+        transition: filter 0.1s ease;
+      }
+      
+      body.glitch-light {
+        filter: sepia(0.2) hue-rotate(-20deg) brightness(1.2) contrast(1.2);
+        transform: translate(1px, 1px);
+      }
+      
+      body.glitch-heavy {
+        filter: sepia(0.8) hue-rotate(-40deg) brightness(1.5) contrast(1.5) blur(1px);
+        transform: translate(-3px, 2px);
+      }
+      
+      /* CRT Scanlines Overlay */
+      #scanlines {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(
+          to bottom,
+          rgba(255,255,255,0),
+          rgba(255,255,255,0) 50%,
+          rgba(0,0,0,0.1) 50%,
+          rgba(0,0,0,0.1)
+        );
+        background-size: 100% 4px;
+        z-index: 50;
+        opacity: 0.4;
       }
 
       canvas {
@@ -41,23 +69,25 @@
 
       #integrity-bar-wrapper {
         width: 200px;
-        height: 8px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 4px;
+        height: 6px;
+        background: rgba(255,255,255,0.05);
+        border-radius: 2px;
         overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.15);
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 0 8px rgba(123, 47, 255, 0.2);
       }
 
       #integrity-bar {
         height: 100%;
         width: 100%;
         background: linear-gradient(to right, #7b2fff, #00e5ff);
-        border-radius: 4px;
-        transition: width 0.1s ease, background 0.3s ease;
+        box-shadow: 0 0 10px rgba(0,229,255,0.5);
+        transition: width 0.1s ease;
       }
 
       #integrity-bar.danger {
         background: linear-gradient(to right, #ff3737, #ff9900);
+        box-shadow: 0 0 10px rgba(255,55,55,0.6);
       }
 
       #integrity-value {
@@ -164,6 +194,107 @@
         94% { opacity: 1; }
       }
 
+      /* Objetivo (HUD canto superior direito) */
+      #objective {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10;
+        text-align: right;
+        user-select: none;
+      }
+
+      #objective-label {
+        font-size: 10px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.35);
+        margin-bottom: 4px;
+      }
+
+      #objective-text {
+        font-size: 12px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: #00ffcc;
+        padding: 4px 10px;
+        border: 1px solid rgba(0,255,204,0.3);
+        border-radius: 3px;
+        background: rgba(0,255,204,0.06);
+        animation: objective-pulse 3s ease-in-out infinite;
+      }
+
+      @keyframes objective-pulse {
+        0%, 100% { border-color: rgba(0,255,204,0.3); color: #00ffcc; }
+        50%       { border-color: rgba(0,255,204,0.7); color: #80ffe8; }
+      }
+
+      /* Tela de vitória */
+      #victory {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.93);
+        z-index: 100;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        text-align: center;
+      }
+
+      #victory.visible {
+        display: flex;
+      }
+
+      #victory h1 {
+        font-size: 52px;
+        letter-spacing: 10px;
+        text-transform: uppercase;
+        color: #00ffcc;
+        margin-bottom: 8px;
+        animation: victory-glow 1.6s ease-in-out infinite alternate;
+      }
+
+      #victory .subtitle {
+        font-size: 13px;
+        letter-spacing: 6px;
+        color: rgba(0,255,204,0.5);
+        text-transform: uppercase;
+        margin-bottom: 20px;
+      }
+
+      #victory-stats {
+        font-size: 14px;
+        letter-spacing: 4px;
+        color: #fff;
+        text-transform: uppercase;
+        margin-bottom: 40px;
+        line-height: 1.8;
+      }
+
+      #victory .hint {
+        font-size: 12px;
+        color: #00ffcc;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        cursor: pointer;
+        border: 1px solid rgba(0,255,204,0.4);
+        padding: 10px 24px;
+        border-radius: 3px;
+        transition: all 0.3s ease;
+      }
+
+      #victory .hint:hover {
+        background: rgba(0,255,204,0.12);
+        color: #80ffe8;
+      }
+
+      @keyframes victory-glow {
+        from { text-shadow: 0 0 10px rgba(0,255,204,0.4); }
+        to   { text-shadow: 0 0 30px rgba(0,255,204,0.9), 0 0 60px rgba(0,255,204,0.4); }
+      }
+
       /* Crosshair */
       #crosshair {
         position: fixed;
@@ -199,8 +330,29 @@
     </style>
   </head>
   <body>
+    <!-- CRT Scanlines -->
+    <div id="scanlines"></div>
 
-    <!-- HUD -->
+    <!-- HUD Score/Timer -->
+    <div id="hud-timer" style="position:fixed;top:20px;left:50%;
+      transform:translateX(-50%);color:#00ffcc;font-family:monospace;
+      font-size:14px;letter-spacing:0.25em;opacity:0.8;text-shadow:0 0 5px #00ffcc"></div>
+      
+    <div id="hud-score" style="position:fixed;top:40px;left:50%;
+      transform:translateX(-50%);color:#ffaa00;font-family:monospace;
+      font-size:12px;letter-spacing:0.2em;opacity:0.7;text-shadow:0 0 5px #ffaa00"></div>
+
+    <!-- HUD Alerta Global -->
+    <div id="global-alert" style="position:fixed;top:65px;left:50%;
+      transform:translateX(-50%);color:#ff2200;font-family:monospace;
+      font-size:16px;letter-spacing:0.2em;display:none;font-weight:bold;
+      text-shadow:0 0 8px #ff2200, 0 0 14px #ff2200;z-index:25">⚠ ALERTA GLOBAL</div>
+      
+    <div id="alert-overlay" style="position:fixed;inset:0;background:red;
+      opacity:0;pointer-events:none;z-index:5"></div>
+
+    <!-- HUD Base -->
+    <div id="phase-display" style="position:fixed;top:20px;left:24px;color:#00ffcc;font-family:monospace;font-size:12px;letter-spacing:0.2em;opacity:0.7">FASE 01</div>
     <div id="hud">
       <div id="integrity-label">Integridade</div>
       <div id="integrity-bar-wrapper">
@@ -213,19 +365,41 @@
     <!-- Crosshair -->
     <div id="crosshair"></div>
 
+    <!-- Hack charges HUD -->
+    <div id="hack-charges" style="position:fixed;bottom:70px;left:50%;
+      transform:translateX(-50%);color:#00ffcc;font-family:monospace;
+      font-size:13px;letter-spacing:0.2em;text-align:center;
+      pointer-events:none;z-index:20;text-shadow:0 0 8px rgba(0,255,204,0.6);
+      transition:color 0.2s ease,opacity 0.2s ease"></div>
+
     <!-- Controls hint -->
     <div id="controls">
       WASD — Mover<br>
       Mouse — Câmera<br>
-      E — Interagir com luz<br>
+      E — Hack de luz<br>
       Click — Capturar cursor
     </div>
+
+    <!-- Objetivo -->
+    <div id="objective">
+      <div id="objective-label">Objetivo</div>
+      <div id="objective-text">▶ Alcance a saída</div>
+    </div>
+    <div id="objective-arrow" style="position:fixed;top:20px;right:24px;text-align:center;color:#00ffcc;font-family:monospace;font-size:22px;opacity:0.85;">↑<br><span id="portal-dist" style="font-size:11px;letter-spacing:0.15em"></span></div>
 
     <!-- Game Over -->
     <div id="game-over">
       <h1>PENUMBRA</h1>
       <div class="subtitle">A entidade se dissolveu na luz</div>
       <div class="hint" id="restart-btn">[ REINICIAR ]</div>
+    </div>
+
+    <!-- Vitória -->
+    <div id="victory">
+      <h1>PROTOCOLO CONCLUÍDO</h1>
+      <div class="subtitle">UMBRA-7 escapou para as sombras</div>
+      <div id="victory-stats">SCORE: 0<br>TEMPO: 00:00</div>
+      <div class="hint" id="victory-restart-btn">[ JOGAR NOVAMENTE ]</div>
     </div>
 
     <script type="module" src="/src/main.js"></script>

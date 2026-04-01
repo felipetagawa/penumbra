@@ -13,6 +13,10 @@ export function createGameLogic() {
   let onRestartCallback = null
   let spawnTimer = SPAWN_INVINCIBILITY // contagem regressiva de invencibilidade
 
+  let timer = 0
+  let score = 0
+  let phaseStartTime = 0
+
   const restartBtn = document.getElementById('restart-btn')
   restartBtn.addEventListener('click', () => {
     if (onRestartCallback) onRestartCallback()
@@ -27,6 +31,9 @@ export function createGameLogic() {
    */
   function update(delta, inLight, exposureLevel) {
     if (isGameOver) return false
+
+    // Timer incrementado sempre que o jogo roda
+    timer += delta
 
     // Invencibilidade no spawn
     if (spawnTimer > 0) {
@@ -64,6 +71,8 @@ export function createGameLogic() {
     integrity = MAX_INTEGRITY
     isGameOver = false
     spawnTimer = SPAWN_INVINCIBILITY
+    // Note: score e timer são preservados ou resetados? 
+    // O pedido inclui resetTimer e resetScore explícitos se precisarmos chamar do main.js
   }
 
   function onRestart(callback) {
@@ -74,12 +83,38 @@ export function createGameLogic() {
     return isGameOver
   }
 
+  // --- Funções de Score e Timer ---
+  function completePhase() {
+    const timeSpent = timer - phaseStartTime
+    const timeBonus = Math.max(0, 500 - Math.floor(timeSpent) * 10)
+    const intBonus = Math.floor(integrity) * 3
+    
+    score += 1000 + timeBonus + intBonus
+    phaseStartTime = timer
+  }
+
+  function addDetectionPenalty() {
+    score -= 100
+    if (score < 0) score = 0 // não deixa o score total ficar negativo
+  }
+
+  function getScore() { return score }
+  function getTimer() { return timer }
+  function resetTimer() { timer = 0; phaseStartTime = 0 }
+  function resetScore() { score = 0 }
+
   return {
     update,
     getIntegrity,
     getIntegrityPercent,
     restart,
     onRestart,
-    getIsGameOver
+    getIsGameOver,
+    completePhase,
+    addDetectionPenalty,
+    getScore,
+    getTimer,
+    resetTimer,
+    resetScore
   }
 }

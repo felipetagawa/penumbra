@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PENUMBRA</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #000;
+        overflow: hidden;
+        font-family: 'Courier New', monospace;
+      }
+
+      canvas {
+        display: block;
+      }
+
+      /* HUD */
+      #hud {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 10;
+        color: #fff;
+        user-select: none;
+      }
+
+      #integrity-label {
+        font-size: 11px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: #aaa;
+        margin-bottom: 6px;
+      }
+
+      #integrity-bar-wrapper {
+        width: 200px;
+        height: 8px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.15);
+      }
+
+      #integrity-bar {
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(to right, #7b2fff, #00e5ff);
+        border-radius: 4px;
+        transition: width 0.1s ease, background 0.3s ease;
+      }
+
+      #integrity-bar.danger {
+        background: linear-gradient(to right, #ff3737, #ff9900);
+      }
+
+      #integrity-value {
+        font-size: 12px;
+        color: #ccc;
+        margin-top: 4px;
+      }
+
+      /* Status de luz/sombra */
+      #shadow-status {
+        margin-top: 16px;
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 3px;
+        display: inline-block;
+        transition: all 0.3s ease;
+      }
+
+      #shadow-status.safe {
+        color: #00e5ff;
+        background: rgba(0, 229, 255, 0.1);
+        border: 1px solid rgba(0, 229, 255, 0.3);
+      }
+
+      #shadow-status.danger {
+        color: #ff3737;
+        background: rgba(255, 55, 55, 0.1);
+        border: 1px solid rgba(255, 55, 55, 0.3);
+      }
+
+      /* Controls hint */
+      #controls {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        color: rgba(255,255,255,0.35);
+        font-size: 11px;
+        letter-spacing: 1px;
+        line-height: 1.8;
+        user-select: none;
+      }
+
+      /* Game Over screen */
+      #game-over {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.92);
+        z-index: 100;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        text-align: center;
+      }
+
+      #game-over.visible {
+        display: flex;
+      }
+
+      #game-over h1 {
+        font-size: 64px;
+        letter-spacing: 12px;
+        text-transform: uppercase;
+        color: #fff;
+        margin-bottom: 8px;
+        animation: flicker 2s infinite;
+      }
+
+      #game-over .subtitle {
+        font-size: 13px;
+        letter-spacing: 6px;
+        color: #555;
+        text-transform: uppercase;
+        margin-bottom: 40px;
+      }
+
+      #game-over .hint {
+        font-size: 12px;
+        color: #7b2fff;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        cursor: pointer;
+        border: 1px solid rgba(123, 47, 255, 0.4);
+        padding: 10px 24px;
+        border-radius: 3px;
+        transition: all 0.3s ease;
+      }
+
+      #game-over .hint:hover {
+        background: rgba(123, 47, 255, 0.15);
+        color: #a87fff;
+      }
+
+      @keyframes flicker {
+        0%, 100% { opacity: 1; }
+        45% { opacity: 1; }
+        50% { opacity: 0.4; }
+        55% { opacity: 1; }
+        90% { opacity: 1; }
+        92% { opacity: 0.6; }
+        94% { opacity: 1; }
+      }
+
+      /* Crosshair */
+      #crosshair {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 16px;
+        height: 16px;
+        pointer-events: none;
+        opacity: 0.5;
+      }
+
+      #crosshair::before,
+      #crosshair::after {
+        content: '';
+        position: absolute;
+        background: #fff;
+      }
+
+      #crosshair::before {
+        width: 1px;
+        height: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      #crosshair::after {
+        height: 1px;
+        width: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div id="integrity-label">Integridade</div>
+      <div id="integrity-bar-wrapper">
+        <div id="integrity-bar"></div>
+      </div>
+      <div id="integrity-value">100%</div>
+      <div id="shadow-status" class="safe">● Sombra</div>
+    </div>
+
+    <!-- Crosshair -->
+    <div id="crosshair"></div>
+
+    <!-- Controls hint -->
+    <div id="controls">
+      WASD — Mover<br>
+      Mouse — Câmera<br>
+      E — Interagir com luz<br>
+      Click — Capturar cursor
+    </div>
+
+    <!-- Game Over -->
+    <div id="game-over">
+      <h1>PENUMBRA</h1>
+      <div class="subtitle">A entidade se dissolveu na luz</div>
+      <div class="hint" id="restart-btn">[ REINICIAR ]</div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

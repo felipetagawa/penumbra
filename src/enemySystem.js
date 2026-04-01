@@ -5,7 +5,7 @@ import * as THREE from 'three'
  * Fase 6: visual mais ameaçador — pulso agressivo, glow no alerta, SpotLight dinâmica
  */
 
-const PATROL_SPEED   = 5.0
+const PATROL_SPEED   = 3.8
 const SPOT_INTENSITY = 9
 const SPOT_RANGE     = 14
 const SPOT_ANGLE     = 0.38
@@ -83,6 +83,29 @@ export function createEnemySystem(scene) {
     alertSphere.position.y = 0.65
     pivot.add(alertSphere)
 
+    // --- Cone visual no chão ---
+    const shape = new THREE.Shape()
+    shape.moveTo(0, 0)
+    const halfAngle = SPOT_ANGLE * 1.2
+    const steps = 20
+    for (let i = 0; i <= steps; i++) {
+      const a = -halfAngle + (i / steps) * halfAngle * 2
+      shape.lineTo(Math.sin(a) * SPOT_RANGE, Math.cos(a) * SPOT_RANGE)
+    }
+    shape.closePath()
+    const coneVisualGeo = new THREE.ShapeGeometry(shape)
+    const coneVisualMat = new THREE.MeshBasicMaterial({
+      color: 0xff6600,
+      transparent: true,
+      opacity: 0.13,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const coneVisual = new THREE.Mesh(coneVisualGeo, coneVisualMat)
+    coneVisual.rotation.x = -Math.PI / 2
+    coneVisual.position.y = 0.05
+    scene.add(coneVisual)
+
     // --- lightEntry compatível com lightSystem ---
     const lightEntry = {
       pointLight: spotLight,
@@ -96,7 +119,7 @@ export function createEnemySystem(scene) {
 
     enemies.push({
       pivot, body, bodyMat, ring, ringMat, ring2, ring2Mat,
-      spotLight, spotTarget, alertSphere, ownMeshes, lightEntry,
+      spotLight, spotTarget, alertSphere, ownMeshes, lightEntry, coneVisual,
       patrolA: patrolA.clone(),
       patrolB: patrolB.clone(),
       direction: 1,
@@ -154,6 +177,30 @@ export function createEnemySystem(scene) {
     alertSphere.position.y = 0.45
     pivot.add(alertSphere)
 
+    // --- Cone visual no chão (Hunter) ---
+    const shape = new THREE.Shape()
+    shape.moveTo(0, 0)
+    const halfAngle = SPOT_ANGLE * 3.0
+    const hunterRange = 10
+    const steps = 20
+    for (let i = 0; i <= steps; i++) {
+      const a = -halfAngle + (i / steps) * halfAngle * 2
+      shape.lineTo(Math.sin(a) * hunterRange, Math.cos(a) * hunterRange)
+    }
+    shape.closePath()
+    const coneVisualGeo = new THREE.ShapeGeometry(shape)
+    const coneVisualMat = new THREE.MeshBasicMaterial({
+      color: 0xcc0044,
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const coneVisual = new THREE.Mesh(coneVisualGeo, coneVisualMat)
+    coneVisual.rotation.x = -Math.PI / 2
+    coneVisual.position.y = 0.05
+    scene.add(coneVisual)
+
     // --- lightEntry ---
     const lightEntry = {
       pointLight: spotLight,
@@ -168,15 +215,16 @@ export function createEnemySystem(scene) {
     enemies.push({
       pivot, body, bodyMat,
       ring: null, ringMat: null, ring2: null, ring2Mat: null,
-      spotLight, spotTarget, alertSphere, ownMeshes, lightEntry,
+      spotLight, spotTarget, alertSphere, ownMeshes, lightEntry, coneVisual,
       patrolA: startPos.clone(),
       patrolB: startPos.clone(),
       direction: 1,
       state: 'alert',
       alertTimer: Infinity,
       pulseTime: 0,
-      hunterSpeed: 4.5,
+      hunterSpeed: 3.2,
       isHunter: true,
+      leashRadius: 22,
       detectionAngleMult: 3.0,
     })
 
@@ -191,15 +239,29 @@ export function createEnemySystem(scene) {
     for (const enemy of enemies) {
       const {
         pivot, body, bodyMat, ring, ringMat, ring2, ring2Mat,
-        spotLight, spotTarget, alertSphere, ownMeshes, lightEntry,
+        spotLight, spotTarget, alertSphere, ownMeshes, lightEntry, coneVisual,
         patrolA, patrolB
       } = enemy
 
       // ---- Movimento (patrulha ou perseguição) ----
-      const target = (enemy.state === 'alert')
-        ? new THREE.Vector3(playerPosition.x, DRONE_HEIGHT, playerPosition.z)
-        : (enemy.direction === 1 ? enemy.patrolB : enemy.patrolA)
-          .clone().setY(DRONE_HEIGHT)
+      let target;
+      if (enemy.state === 'alert') {
+        let isLeashed = false;
+        if (enemy.isHunter && enemy.leashRadius !== undefined) {
+          const pPos = new THREE.Vector3(playerPosition.x, DRONE_HEIGHT, playerPosition.z);
+          const distToPlayer = pivot.position.distanceTo(pPos);
+          if (distToPlayer > enemy.leashRadius) {
+            isLeashed = true;
+          }
+        }
+        
+        target = isLeashed 
+          ? enemy.patrolA.clone().setY(DRONE_HEIGHT) 
+          : new THREE.Vector3(playerPosition.x, DRONE_HEIGHT, playerPosition.z);
+      } else {
+        target = (enemy.direction === 1 ? enemy.patrolB : enemy.patrolA).clone().setY(DRONE_HEIGHT);
+      }
+      
       const targetPos = target
       const toTarget  = new THREE.Vector3().subVectors(targetPos, pivot.position)
       const dist      = toTarget.length()
@@ -239,6 +301,11 @@ export function createEnemySystem(scene) {
 
       // ---- Sincronizar lightEntry ----
       lightEntry.position.copy(pivot.position)
+
+      // ---- Atualizar Cone Visual no chão ----
+      coneVisual.position.x = pivot.position.x
+      coneVisual.position.z = pivot.position.z
+      coneVisual.rotation.z = -pivot.rotation.y
 
       // ---- Detecção do player ----
       const playerPos   = playerPosition.clone()
@@ -300,6 +367,12 @@ export function createEnemySystem(scene) {
           ringMat.emissiveIntensity = 0.5 + alertPulse * 0.8
           ring2Mat.emissive.set(0xff2200)
           ring2Mat.emissiveIntensity = 0.6 + alertPulse
+          
+          coneVisual.material.color.set(0xff0000)
+          coneVisual.material.opacity = 0.22
+        } else {
+          coneVisual.material.color.set(0xcc0044)
+          coneVisual.material.opacity = 0.22
         }
 
         // Esfera de alerta pulsando
@@ -324,6 +397,9 @@ export function createEnemySystem(scene) {
           ringMat.emissiveIntensity = 0.3 + patrolPulse * 0.4
           ring2Mat.emissive.set(0xffaa00)
           ring2Mat.emissiveIntensity = 0.2 + patrolPulse * 0.3
+          
+          coneVisual.material.color.set(0xff6600)
+          coneVisual.material.opacity = 0.13
         }
 
         alertSphere.material.opacity = 0
@@ -342,7 +418,7 @@ export function createEnemySystem(scene) {
 
   spawnDrone(new THREE.Vector3(-10, 0, 0), new THREE.Vector3(10, 0, 0))
   spawnDrone(new THREE.Vector3(0, 0, -10), new THREE.Vector3(0, 0, 10))
-  spawnHunter(new THREE.Vector3(-15, 0, -15))
+  spawnHunter(new THREE.Vector3(18, 0, 18))
 
   function getAlertState() {
     // Retorna true somente se um DRONE NORMAL (patrulha) estiver em alerta,
@@ -354,7 +430,7 @@ export function createEnemySystem(scene) {
     if (phase === 1) {
       enemies[0].patrolA.set(-10, 0, 0); enemies[0].patrolB.set(10, 0, 0);
       enemies[1].patrolA.set(0, 0, -10); enemies[1].patrolB.set(0, 0, 10);
-      enemies[2].patrolA.set(-15, 0, -15); enemies[2].patrolB.set(-15, 0, -15);
+      enemies[2].patrolA.set(18, 0, 18); enemies[2].patrolB.set(18, 0, 18);
     } else if (phase === 2) {
       // Fase Corredor
       enemies[0].patrolA.set(0, 0, 5); enemies[0].patrolB.set(0, 0, 20);
@@ -375,5 +451,13 @@ export function createEnemySystem(scene) {
     });
   }
 
-  return { update, getEnemyLightEntries, getAlertState, resetEnemyPatrols }
+  function getEnemyPositions() {
+    return enemies.map(e => ({
+      x: e.pivot.position.x,
+      z: e.pivot.position.z,
+      state: e.state
+    }))
+  }
+
+  return { update, getEnemyLightEntries, getAlertState, resetEnemyPatrols, getEnemyPositions }
 }

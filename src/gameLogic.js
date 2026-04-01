@@ -3,9 +3,9 @@
  */
 
 const MAX_INTEGRITY = 100
-const DAMAGE_PER_SECOND = 18    // dano por segundo na luz
-const HEAL_PER_SECOND = 5       // recuperação lenta na sombra (feedback positivo)
-const SPAWN_INVINCIBILITY = 3   // segundos de invencibilidade ao spawnar
+const DAMAGE_PER_SECOND = 8     // dano por segundo na luz
+const HEAL_PER_SECOND = 12      // recuperação lenta na sombra (feedback positivo)
+const SPAWN_INVINCIBILITY = 5   // segundos de invencibilidade ao spawnar
 
 export function createGameLogic() {
   let integrity = MAX_INTEGRITY

@@ -70,16 +70,25 @@ export function createLightSystem(scene) {
     halo.lookAt(x, y + 1, z) // sempre horizontal
     scene.add(halo)
 
+    let spriteData = null
+    if (interactable) {
+      spriteData = createCooldownSprite()
+      spriteData.sprite.position.set(x, y + 0.5, z)
+      scene.add(spriteData.sprite)
+    }
+
     lights.push({
       pointLight,
       sphere,
       halo,
+      spriteData,
       position: new THREE.Vector3(x, y, z),
       color,
       intensity,
       range,
       interactable,
       on: true,
+      hackTimer: 0,
     })
   })
 
@@ -160,18 +169,14 @@ export function createLightSystem(scene) {
     // A luz já está desligada: ligar normalmente (sem custo de carga)
     if (!entry.on) {
       _setLightOn(entry, true)
+      entry.hackTimer = 0
       return true
     }
 
     // Desligar — consumir 1 carga
     hackCharges--
     _setLightOn(entry, false)
-
-    // Religar automaticamente após HACK_OFF_DURATION segundos
-    clearTimeout(entry._hackTimer)
-    entry._hackTimer = setTimeout(() => {
-      if (!entry.on) _setLightOn(entry, true)
-    }, HACK_OFF_DURATION * 1000)
+    entry.hackTimer = HACK_OFF_DURATION
 
     return true
   }
@@ -213,6 +218,37 @@ export function createLightSystem(scene) {
   // Chamar todo frame com (delta, playerInLight)
   // -----------------------------------------------------------------
   function update(delta, playerInLight) {
+    // Atualiza lógica individual das luzes (cooldown de hack)
+    for (const entry of lights) {
+      if (!entry.interactable) continue
+
+      if (!entry.on) {
+        entry.hackTimer -= delta
+        if (entry.hackTimer <= 0) {
+          _setLightOn(entry, true)
+          entry.hackTimer = 0
+          if (entry.spriteData) entry.spriteData.sprite.visible = false
+        } else if (entry.spriteData) {
+          entry.spriteData.sprite.visible = true
+          const progress = Math.max(0, 1 - (entry.hackTimer / HACK_OFF_DURATION))
+          const { ctx, texture } = entry.spriteData
+          
+          ctx.clearRect(0, 0, 64, 10)
+          ctx.fillStyle = '#111'
+          ctx.fillRect(0, 0, 64, 10)
+          ctx.fillStyle = progress < 0.6 ? '#ff3300' : '#00ffcc'
+          ctx.fillRect(1, 1, Math.floor(62 * progress), 8)
+          ctx.strokeStyle = '#333'
+          ctx.strokeRect(0, 0, 64, 10)
+          texture.needsUpdate = true
+        }
+      } else {
+        if (entry.spriteData && entry.spriteData.sprite.visible) {
+          entry.spriteData.sprite.visible = false
+        }
+      }
+    }
+
     // Recarga só acontece na sombra
     if (!playerInLight && hackCharges < MAX_CHARGES) {
       rechargeTimer += delta
@@ -265,4 +301,17 @@ export function createLightSystem(scene) {
   function getHackCharges() { return hackCharges }
 
   return { getLights, checkPlayerLight, toggleLight, hackLight, update, getHackCharges, setEmergencyMode }
+}
+
+function createCooldownSprite() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 64; canvas.height = 10
+  const ctx = canvas.getContext('2d')
+  const texture = new THREE.CanvasTexture(canvas)
+  
+  const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false })
+  const sprite = new THREE.Sprite(spriteMat)
+  sprite.scale.set(1.2, 0.18, 1)
+  sprite.visible = false
+  return { sprite, canvas, ctx, texture }
 }

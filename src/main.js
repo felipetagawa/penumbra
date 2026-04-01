@@ -199,6 +199,9 @@ function gameLoop() {
   // Atualizar seta direcional do objetivo
   updateObjectiveArrow(camera.position, camera.rotation.y, levelSystem.getExitPosition())
 
+  // Atualizar minimap
+  updateMinimap(camera, enemySystem.getEnemyPositions(), levelSystem.getExitPosition())
+
   renderer.render(scene, camera)
 }
 
@@ -407,5 +410,69 @@ document.getElementById('victory-restart-btn').addEventListener('click', () => {
 
   clock.getDelta()
 })
+
+// --- Minimap ---
+function updateMinimap(camera, enemiesList, exitPos) {
+  const mm = document.getElementById('minimap')
+  if (!mm) return
+  const mc = mm.getContext('2d')
+  mc.clearRect(0, 0, 140, 140)
+
+  // b) Escala
+  const scale = 140 / 60   // ~2.33px por unidade
+
+  // c) Desenhar borda do mapa
+  mc.strokeStyle = 'rgba(0,255,204,0.2)'
+  mc.lineWidth = 1
+  mc.strokeRect(1, 1, 138, 138)
+
+  // d) Pilares
+  mc.fillStyle = 'rgba(80,0,180,0.5)'
+  const pilares = [
+    [-8,-8], [8,-8], [-8,8], [8,8],
+    [0,-15], [0,15], [-15,0], [15,0]
+  ]
+  pilares.forEach(([px, pz]) => {
+    const cx = (px + 30) * scale
+    const cy = (pz + 30) * scale
+    mc.fillRect(cx - 1.7, cy - 1.7, 3.5, 3.5)
+  })
+
+  // e) Portal de saída
+  const exitCx = (exitPos.x + 30) * scale
+  const exitCy = (exitPos.z + 30) * scale
+  mc.beginPath()
+  mc.arc(exitCx, exitCy, 5, 0, Math.PI * 2)
+  mc.fillStyle = 'rgba(0,255,180,0.8)'
+  mc.fill()
+
+  // f) Drones
+  enemiesList.forEach(e => {
+    const droneCx = (e.x + 30) * scale
+    const droneCy = (e.z + 30) * scale
+    const droneColor = e.state === 'alert' ? '#ff2200' : '#ff8800'
+    mc.beginPath()
+    mc.arc(droneCx, droneCy, 4, 0, Math.PI * 2)
+    mc.fillStyle = droneColor
+    mc.fill()
+  })
+
+  // g) Player
+  const playerCx = (camera.position.x + 30) * scale
+  const playerCy = (camera.position.z + 30) * scale
+  mc.beginPath()
+  mc.arc(playerCx, playerCy, 4, 0, Math.PI * 2)
+  mc.fillStyle = '#00e5ff'
+  mc.fill()
+  
+  // Seta do Player
+  const yaw = camera.rotation.y
+  mc.beginPath()
+  mc.moveTo(playerCx, playerCy)
+  mc.lineTo(playerCx - Math.sin(yaw) * 9, playerCy - Math.cos(yaw) * 9)
+  mc.strokeStyle = '#00e5ff'
+  mc.lineWidth = 1.5
+  mc.stroke()
+}
 
 gameLoop()
